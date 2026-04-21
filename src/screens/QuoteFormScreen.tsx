@@ -41,7 +41,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
   const [validDays, setValidDays] = useState("30");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: makeId(), description: "", quantity: 1, unit_price: 0 },
+    { id: makeId(), description: "", quantity: "" as unknown as number, unit_price: "" as unknown as number },
   ]);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -66,21 +66,26 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
           setTaxRate(String(q.tax_rate));
           setValidDays(String(q.valid_days));
           setNotes(q.notes ?? "");
-          setLineItems(q.line_items.length ? q.line_items : [{ id: makeId(), description: "", quantity: 1, unit_price: 0 }]);
+          setLineItems(q.line_items.length ? q.line_items : [{ id: makeId(), description: "", quantity: "" as unknown as number, unit_price: "" as unknown as number }]);
           setLoaded(true);
         });
     }, [quoteId])
   );
 
   const tax = parseFloat(taxRate) || 0;
-  const { subtotal, taxAmount, total } = calculateTotals(lineItems, tax);
+  const parsedItems = lineItems.map((item) => ({
+    ...item,
+    quantity: Number(item.quantity) || 0,
+    unit_price: Number(item.unit_price) || 0,
+  }));
+  const { subtotal, taxAmount, total } = calculateTotals(parsedItems, tax);
 
   function updateItem(id: string, field: keyof LineItem, value: string | number) {
     setLineItems((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   }
 
   function addItem() {
-    setLineItems((prev) => [...prev, { id: makeId(), description: "", quantity: 1, unit_price: 0 }]);
+    setLineItems((prev) => [...prev, { id: makeId(), description: "", quantity: "" as unknown as number, unit_price: "" as unknown as number }]);
   }
 
   function removeItem(id: string) {
@@ -96,7 +101,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
       customer_email: customerEmail.trim() || null,
       job_address: jobAddress.trim(),
       scope_of_work: scopeOfWork.trim() || null,
-      line_items: lineItems,
+      line_items: parsedItems,
       tax_rate: tax,
       subtotal,
       tax_amount: taxAmount,
@@ -139,6 +144,16 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
     }
     if (!customerPhone.trim() && !customerEmail.trim()) {
       Alert.alert("Required", "Add a phone number or email to send this quote.");
+      return;
+    }
+    const hasEmptyQty = lineItems.some((i) => i.description && (!i.quantity || Number(i.quantity) <= 0));
+    if (hasEmptyQty) {
+      Alert.alert("Missing Quantity", "Every line item needs a quantity greater than 0.");
+      return;
+    }
+    const hasEmptyPrice = lineItems.some((i) => i.description && (!i.unit_price && i.unit_price !== 0));
+    if (hasEmptyPrice) {
+      Alert.alert("Missing Price", "Every line item needs a price.");
       return;
     }
     setSending(true);
@@ -223,16 +238,16 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
                   style={[styles.input, styles.smallInput]}
                   placeholder="Qty"
                   placeholderTextColor={colors.gray[400]}
-                  value={String(item.quantity)}
-                  onChangeText={(v) => updateItem(item.id, "quantity", parseFloat(v) || 0)}
+                  value={item.quantity === ("" as unknown as number) ? "" : String(item.quantity)}
+                  onChangeText={(v) => updateItem(item.id, "quantity", v === "" ? ("" as unknown as number) : parseFloat(v))}
                   keyboardType="numeric"
                 />
                 <TextInput
                   style={[styles.input, styles.smallInput]}
                   placeholder="Price"
                   placeholderTextColor={colors.gray[400]}
-                  value={item.unit_price ? String(item.unit_price) : ""}
-                  onChangeText={(v) => updateItem(item.id, "unit_price", parseFloat(v) || 0)}
+                  value={item.unit_price === ("" as unknown as number) ? "" : String(item.unit_price)}
+                  onChangeText={(v) => updateItem(item.id, "unit_price", v === "" ? ("" as unknown as number) : parseFloat(v))}
                   keyboardType="numeric"
                 />
                 {lineItems.length > 1 && (
