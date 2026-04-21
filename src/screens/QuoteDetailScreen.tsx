@@ -110,10 +110,10 @@ export default function QuoteDetailScreen({ route, navigation }: Props) {
 
   async function handleDecline() {
     if (!quote) return;
-    Alert.alert("Decline Quote", "Mark this quote as declined?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Cancel Quote", "Cancel this quote? The customer will no longer be able to accept it.", [
+      { text: "Keep Quote", style: "cancel" },
       {
-        text: "Decline",
+        text: "Cancel Quote",
         style: "destructive",
         onPress: async () => {
           await supabase.from("quotes").update({ status: "declined" }).eq("id", quote.id);
@@ -248,7 +248,7 @@ export default function QuoteDetailScreen({ route, navigation }: Props) {
         )}
         {(quote.status === "sent" || quote.status === "viewed") && (
           <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-            <Text style={styles.declineBtnText}>Decline</Text>
+            <Text style={styles.declineBtnText}>Cancel Quote</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.outlineBtn} onPress={handleShare}>

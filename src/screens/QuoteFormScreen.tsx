@@ -179,7 +179,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
         throw new Error(err.error || "Failed to send");
       }
 
-      Alert.alert("Sent!", "Your customer will receive the quote shortly.");
+      Alert.alert("Quote Sent!", "Your customer will receive it shortly.");
       navigation.replace("QuoteDetail", { quoteId: id! });
     } catch (e: any) {
       Alert.alert("Send failed", e.message || "Please try again.");
