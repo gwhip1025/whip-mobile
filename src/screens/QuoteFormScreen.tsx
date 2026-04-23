@@ -75,13 +75,10 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
   // Single-option line items
   const [lineItems, setLineItems] = useState<LineItemFormData[]>([emptyItem()]);
 
-  // Multi-option
+  // Multi-option — seeds a single "Good" option; user adds Better/Best/Custom via dropdown.
   const [isMultiOption, setIsMultiOption] = useState(false);
-  const [options, setOptions] = useState<OptionDraft[]>([
-    emptyOption("Good"),
-    emptyOption("Better"),
-    emptyOption("Best"),
-  ]);
+  const [options, setOptions] = useState<OptionDraft[]>([emptyOption("Good")]);
+  const [addOptionMenuOpen, setAddOptionMenuOpen] = useState(false);
 
   // Saved items
   const [savedItems, setSavedItems] = useState<SavedLineItem[]>([]);
@@ -243,16 +240,14 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
       )
     );
   }
-  function addOption() {
+  function addOption(name: string) {
     if (options.length >= 5) return;
-    setOptions((prev) => [...prev, emptyOption(`Option ${prev.length + 1}`)]);
+    setOptions((prev) => [...prev, emptyOption(name)]);
+    setAddOptionMenuOpen(false);
   }
-  function removeOption(id: string) {
-    if (options.length <= 2) {
-      Alert.alert("Need at least 2 options", "Multi-option quotes need at least 2 choices.");
-      return;
-    }
-    setOptions((prev) => prev.filter((o) => o.id !== id));
+  function removeOptionAt(index: number) {
+    if (index <= 0) return; // index 0 ("Good") is locked
+    setOptions((prev) => prev.filter((_, i) => i !== index));
   }
 
   // ---- saved item picker ----
@@ -485,30 +480,41 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Template picker button */}
-        {!quoteId && templates.length > 0 && (
+        {/* Template picker — always visible on new quotes so it's discoverable. */}
+        {!quoteId && (
           <TouchableOpacity
             style={styles.templateBtn}
             onPress={() => setShowTemplatePicker((s) => !s)}
           >
             <Text style={styles.templateBtnText}>
-              {showTemplatePicker ? "Hide templates" : `Start from a template (${templates.length})`}
+              {showTemplatePicker
+                ? "Hide templates"
+                : templates.length > 0
+                ? `Pick Template (${templates.length})`
+                : "Pick Template"}
             </Text>
           </TouchableOpacity>
         )}
 
-        {showTemplatePicker && (
+        {showTemplatePicker && !quoteId && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Pick a template</Text>
-            {templates.map((t) => (
-              <TouchableOpacity key={t.id} style={styles.pickerRow} onPress={() => applyTemplate(t)}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pickerRowTitle}>{t.name}</Text>
-                  {t.description ? <Text style={styles.pickerRowSub}>{t.description}</Text> : null}
-                </View>
-                <Text style={styles.pickerChev}>›</Text>
-              </TouchableOpacity>
-            ))}
+            {templates.length === 0 ? (
+              <Text style={styles.emptyTemplates}>
+                No templates yet. Save one from any quote's detail screen by tapping
+                "Save as Template".
+              </Text>
+            ) : (
+              templates.map((t) => (
+                <TouchableOpacity key={t.id} style={styles.pickerRow} onPress={() => applyTemplate(t)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pickerRowTitle}>{t.name}</Text>
+                    {t.description ? <Text style={styles.pickerRowSub}>{t.description}</Text> : null}
+                  </View>
+                  <Text style={styles.pickerChev}>›</Text>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
 
@@ -629,8 +635,8 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
                       value={opt.name}
                       onChangeText={(v) => updateOption(opt.id, "name", v)}
                     />
-                    {options.length > 2 && (
-                      <TouchableOpacity onPress={() => removeOption(opt.id)} style={styles.removeOptBtn}>
+                    {idx > 0 && (
+                      <TouchableOpacity onPress={() => removeOptionAt(idx)} style={styles.removeOptBtn}>
                         <Text style={styles.removeBtnText}>Remove</Text>
                       </TouchableOpacity>
                     )}
@@ -685,11 +691,44 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
               );
             })}
 
-            {options.length < 5 && (
-              <TouchableOpacity style={styles.addOptionBtn} onPress={addOption}>
-                <Text style={styles.addOptionBtnText}>+ Add another option</Text>
-              </TouchableOpacity>
-            )}
+            {options.length < 5 && (() => {
+              const presetNames = ["Good", "Better", "Best"];
+              const usedNames = options.map((o) => o.name);
+              const available = presetNames.filter((n) => !usedNames.includes(n));
+              return (
+                <View>
+                  <TouchableOpacity
+                    style={styles.addOptionBtn}
+                    onPress={() => setAddOptionMenuOpen((o) => !o)}
+                  >
+                    <Text style={styles.addOptionBtnText}>
+                      {addOptionMenuOpen ? "Cancel" : "+ Add Option"}
+                    </Text>
+                  </TouchableOpacity>
+                  {addOptionMenuOpen && (
+                    <View style={styles.addOptionMenu}>
+                      {available.map((name) => (
+                        <TouchableOpacity
+                          key={name}
+                          style={styles.addOptionMenuItem}
+                          onPress={() => addOption(name)}
+                        >
+                          <Text style={styles.addOptionMenuText}>{name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        style={styles.addOptionMenuItem}
+                        onPress={() => addOption(`Option ${options.length + 1}`)}
+                      >
+                        <Text style={[styles.addOptionMenuText, { color: colors.gray[500] }]}>
+                          Custom option…
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
           </>
         )}
 
@@ -860,6 +899,9 @@ const styles = StyleSheet.create({
   addBtnText: { fontSize: 14, fontWeight: "600", color: colors.blue },
   addOptionBtn: { paddingVertical: 14, alignItems: "center", marginBottom: 12, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.gray[200], borderStyle: "dashed" },
   addOptionBtnText: { fontSize: 14, fontWeight: "600", color: colors.blue },
+  addOptionMenu: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.gray[200], marginTop: -8, marginBottom: 12, overflow: "hidden" },
+  addOptionMenuItem: { paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.gray[100] },
+  addOptionMenuText: { fontSize: 15, fontWeight: "600", color: colors.black },
   divider: { height: 1, backgroundColor: colors.gray[200], marginVertical: 10 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
   taxRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
@@ -876,6 +918,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   templateBtn: { backgroundColor: colors.white, borderRadius: 12, padding: 12, alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: colors.gray[200] },
   templateBtnText: { fontSize: 14, fontWeight: "600", color: colors.black },
+  emptyTemplates: { fontSize: 13, color: colors.gray[500], lineHeight: 18 },
   pickSavedBtn: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.gray[100], borderRadius: 8 },
   pickSavedBtnText: { fontSize: 13, fontWeight: "600", color: colors.black },
   pickerRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.gray[100] },
