@@ -68,7 +68,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [jobAddress, setJobAddress] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
-  const [taxRate, setTaxRate] = useState("0");
+  const [taxRate, setTaxRate] = useState("");
   const [validDays, setValidDays] = useState("30");
   const [notes, setNotes] = useState("");
 
@@ -112,7 +112,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
         setCustomerEmail(q.customer_email ?? "");
         setJobAddress(q.job_address);
         setScopeOfWork(q.scope_of_work ?? "");
-        setTaxRate(String(q.tax_rate));
+        setTaxRate(q.tax_rate ? String(q.tax_rate) : "");
         setValidDays(String(q.valid_days));
         setNotes(q.notes ?? "");
         setLineItems(
@@ -297,7 +297,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
   // ---- template apply ----
   function applyTemplate(tpl: QuoteTemplate) {
     setScopeOfWork(tpl.scope_of_work ?? "");
-    setTaxRate(String(tpl.tax_rate));
+    setTaxRate(tpl.tax_rate ? String(tpl.tax_rate) : "");
     setValidDays(String(tpl.valid_days));
     setLineItems(
       (tpl.line_items ?? []).map((li) => ({
@@ -588,6 +588,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
                   value={taxRate}
                   onChangeText={setTaxRate}
                   keyboardType="numeric"
+                  placeholder="0"
                 />
                 <Text style={styles.totalLabel}>%</Text>
               </View>
@@ -617,6 +618,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
                   value={taxRate}
                   onChangeText={setTaxRate}
                   keyboardType="numeric"
+                  placeholder="0"
                 />
                 <Text style={styles.totalLabel}>%</Text>
                 <Text style={[styles.toggleSub, { marginLeft: 8 }]}>Applied to every option.</Text>

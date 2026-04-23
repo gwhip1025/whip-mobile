@@ -33,7 +33,7 @@ export default function InvoiceFormScreen({ navigation }: Props) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [jobAddress, setJobAddress] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
-  const [taxRate, setTaxRate] = useState("0");
+  const [taxRate, setTaxRate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItemFormData[]>([emptyItem()]);
@@ -179,6 +179,7 @@ export default function InvoiceFormScreen({ navigation }: Props) {
                 value={taxRate}
                 onChangeText={setTaxRate}
                 keyboardType="numeric"
+                placeholder="0"
               />
               <Text style={styles.totalLabel}>%</Text>
             </View>
