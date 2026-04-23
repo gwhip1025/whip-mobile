@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.whipapp.whip",
       "infoPlist": {
-        "NSCameraUsageDescription": "Whip needs camera access to add photos to quotes."
+        "NSCameraUsageDescription": "Whip needs camera access to add photos to quotes.",
+        "NSPhotoLibraryUsageDescription": "Whip uses your photos to attach site images to quotes."
       }
     },
     "android": {
