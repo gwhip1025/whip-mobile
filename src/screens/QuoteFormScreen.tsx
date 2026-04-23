@@ -15,7 +15,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { supabase } from "../lib/supabase";
-import { apiFetch, APP_URL } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   Quote,
@@ -304,22 +304,24 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
     setScopeOfWork(tpl.scope_of_work ?? "");
     setTaxRate(tpl.tax_rate ? String(tpl.tax_rate) : "");
     setValidDays(String(tpl.valid_days));
-    setLineItems(
-      (tpl.line_items ?? []).map((li) => ({
-        id: makeId(),
-        description: li.description,
-        quantity: li.quantity,
-        unit_price: li.unit_price,
-      })) as LineItemFormData[]
-    );
-    if (!lineItems.length) setLineItems([emptyItem()]);
+    const items = (tpl.line_items ?? []).map((li) => ({
+      id: makeId(),
+      description: li.description,
+      quantity: li.quantity,
+      unit_price: li.unit_price,
+    })) as LineItemFormData[];
+    // Empty templates still render an editable blank row so the user has
+    // something to fill in.
+    setLineItems(items.length ? items : [emptyItem()]);
     setShowTemplatePicker(false);
   }
 
   // ---- save current form as template ----
-  // Multi-option templates aren't supported by the web API; button is disabled in that mode.
-  const canSaveAsTemplate =
-    !isMultiOption && lineItems.some((i) => i.description.trim().length > 0);
+  // Multi-option: require at least one line item somewhere across all options.
+  // Single-option: require at least one non-empty description.
+  const canSaveAsTemplate = isMultiOption
+    ? options.some((o) => o.line_items.some((li) => li.description.trim().length > 0))
+    : lineItems.some((i) => i.description.trim().length > 0);
 
   async function handleSaveAsTemplate() {
     if (!canSaveAsTemplate) return;
@@ -332,15 +334,42 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
         return;
       }
       try {
-        const res = await apiFetch(`/api/templates`, {
-          method: "POST",
-          body: JSON.stringify({
+        // Build the payload to match the web `handleSaveAsTemplate` contract.
+        // Multi-option templates send `is_multi_option: true` + an `options`
+        // array; single-option sends a flat `line_items` array.
+        let payload: Record<string, unknown>;
+        if (isMultiOption) {
+          const cleanedOptions = options.map((opt, i) => ({
+            name: opt.name.trim() || `Option ${i + 1}`,
+            description: opt.description.trim() || null,
+            // Drop blank line items — saving blanks is pointless and also
+            // confuses web's validator.
+            line_items: parseItems(
+              opt.line_items.filter((li) => li.description.trim())
+            ),
+            sort_order: i,
+          }));
+          payload = {
+            name: trimmed,
+            tax_rate: tax,
+            scope_of_work: scopeOfWork.trim() || null,
+            valid_days: parseInt(validDays) || 30,
+            is_multi_option: true,
+            options: cleanedOptions,
+          };
+        } else {
+          payload = {
             name: trimmed,
             line_items: parseItems(lineItems),
             tax_rate: tax,
             scope_of_work: scopeOfWork.trim() || null,
             valid_days: parseInt(validDays) || 30,
-          }),
+            is_multi_option: false,
+          };
+        }
+        const res = await apiFetch(`/api/templates`, {
+          method: "POST",
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error();
         // Refresh the list so the new template shows up in the picker immediately.
@@ -907,11 +936,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
             onPress={handleSaveAsTemplate}
             disabled={!canSaveAsTemplate || saving || sending}
           >
-            <Text style={styles.templateSaveBtnText}>
-              {isMultiOption
-                ? "Save as Template (single-option only)"
-                : "Save as Template"}
-            </Text>
+            <Text style={styles.templateSaveBtnText}>Save as Template</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.saveBtn}
