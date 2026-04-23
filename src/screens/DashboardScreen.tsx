@@ -116,7 +116,9 @@ export default function DashboardScreen({ navigation }: Props) {
             </View>
             <Text style={styles.jobAddress} numberOfLines={1}>{item.job_address}</Text>
             <View style={styles.quoteFooter}>
-              <Text style={styles.total}>{formatCurrency(item.total)}</Text>
+              <Text style={styles.total}>
+                {item.is_multi_option ? "Multiple options" : formatCurrency(item.total)}
+              </Text>
               <Text style={styles.date}>{formatDate(item.created_at)}</Text>
             </View>
           </TouchableOpacity>
