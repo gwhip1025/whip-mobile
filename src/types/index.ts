@@ -107,6 +107,17 @@ export interface Invoice {
   updated_at: string;
 }
 
+/**
+ * Option inside a multi-option template. Mirrors web `TemplateOption`.
+ * Totals are not stored — they're recomputed at apply-time.
+ */
+export interface TemplateOption {
+  name: string;
+  description: string | null;
+  line_items: LineItem[];
+  sort_order: number;
+}
+
 export interface QuoteTemplate {
   id: string;
   user_id: string;
@@ -116,6 +127,8 @@ export interface QuoteTemplate {
   tax_rate: number;
   scope_of_work: string | null;
   valid_days: number;
+  is_multi_option: boolean;
+  options: TemplateOption[] | null;
   created_at: string;
   updated_at: string;
 }

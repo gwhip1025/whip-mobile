@@ -111,7 +111,17 @@ export default function TemplatesScreen({ navigation }: Props) {
             <TouchableOpacity
               style={styles.card}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate("NewQuote", { templateId: item.id })}
+              onPress={() =>
+                // Jump into the Quotes tab so post-save nav to QuoteDetail
+                // works. SettingsStack doesn't register QuoteDetail and
+                // replacing into a missing route throws.
+                navigation
+                  .getParent()
+                  ?.navigate("QuotesTab", {
+                    screen: "NewQuote",
+                    params: { templateId: item.id },
+                  })
+              }
               onLongPress={() => confirmDelete(item)}
             >
               <View style={styles.cardHeader}>
