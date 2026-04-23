@@ -220,24 +220,22 @@ export default function QuoteDetailScreen({ route, navigation }: Props) {
   }
 
   async function handleSaveLineItems() {
-    if (!quote) return;
+    if (!quote || !user) return;
     const items = collectAllLineItems(quote, options);
     if (items.length === 0) {
       Alert.alert("Nothing to save", "Add line items to the quote first.");
       return;
     }
     try {
-      await Promise.all(
-        items.map((li) =>
-          apiFetch(`/api/saved-items`, {
-            method: "POST",
-            body: JSON.stringify({
-              description: li.description,
-              unit_price: li.unit_price,
-            }),
-          })
-        )
-      );
+      // Direct supabase insert — /api/saved-items on the web does not currently
+      // accept Bearer auth. RLS on saved_line_items enforces user_id ownership.
+      const rows = items.map((li) => ({
+        user_id: user.id,
+        description: li.description,
+        unit_price: li.unit_price,
+      }));
+      const { error } = await supabase.from("saved_line_items").insert(rows);
+      if (error) throw error;
       Alert.alert("Saved", `${items.length} item${items.length === 1 ? "" : "s"} saved for reuse.`);
     } catch {
       Alert.alert("Error", "Failed to save items.");

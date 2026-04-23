@@ -12,7 +12,8 @@ import {
   Platform,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { apiFetch } from "../lib/api";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/auth";
 import { LineItemFormData, Invoice } from "../types";
 import { calculateTotals, formatCurrency } from "../lib/utils";
 import { colors, spacing } from "../lib/theme";
@@ -28,6 +29,7 @@ function emptyItem(): LineItemFormData {
 }
 
 export default function InvoiceFormScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -74,11 +76,19 @@ export default function InvoiceFormScreen({ navigation }: Props) {
     if (hasEmpty) {
       return Alert.alert("Fix line items", "Every line item needs a quantity > 0 and a price.");
     }
+    if (!user) {
+      return Alert.alert("Sign-in required", "Please sign in again before creating an invoice.");
+    }
     setSaving(true);
     try {
-      const res = await apiFetch(`/api/invoices`, {
-        method: "POST",
-        body: JSON.stringify({
+      // Direct supabase insert — mirrors the pattern used by QuoteFormScreen's
+      // save flow. The /api/invoices POST route on the web does not currently
+      // accept Bearer auth, so going direct avoids a 401 and keeps the mobile
+      // flow unblocked. invoice_number is auto-assigned by a DB default.
+      const { data, error } = await supabase
+        .from("invoices")
+        .insert({
+          contractor_id: user.id,
           customer_name: customerName.trim(),
           customer_phone: customerPhone.trim() || null,
           customer_email: customerEmail.trim() || null,
@@ -86,15 +96,18 @@ export default function InvoiceFormScreen({ navigation }: Props) {
           scope_of_work: scopeOfWork.trim() || null,
           line_items: parsed,
           tax_rate: tax,
+          subtotal,
+          tax_amount: taxAmount,
+          total,
           due_date: dueDate.trim() || null,
           notes: notes.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to create invoice");
+        })
+        .select()
+        .single();
+      if (error || !data) {
+        throw new Error(error?.message || "Failed to create invoice");
       }
-      const inv = (await res.json()) as Invoice;
+      const inv = data as Invoice;
       navigation.replace("InvoiceDetail", { invoiceId: inv.id });
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to create invoice.");
