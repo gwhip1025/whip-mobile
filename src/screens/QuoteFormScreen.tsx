@@ -96,6 +96,10 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [loaded, setLoaded] = useState(!quoteId);
+  // Tracks an auto-created draft id when a new-quote user attaches a photo
+  // before typing customer info. Mirrors the web draftQuoteId pattern in
+  // components/QuoteForm.tsx.
+  const [draftQuoteId, setDraftQuoteId] = useState<string | null>(quoteId ?? null);
 
   useFocusEffect(
     useCallback(() => {
@@ -442,13 +446,56 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
     }
   }
 
+  /**
+   * Called by QuotePhotoUploader when the user tries to attach a photo
+   * before saving the quote. Persists a draft using whatever values the
+   * form has so far, filling placeholder text for required fields that
+   * are still empty. The user can overwrite the placeholders later by
+   * filling in real customer name / address and saving again.
+   *
+   * Returns the new quote id (or null on failure).
+   */
+  async function ensureQuoteForPhotos(): Promise<string | null> {
+    if (draftQuoteId) return draftQuoteId;
+    try {
+      const payload = buildPayload();
+      if (!payload.customer_name) {
+        payload.customer_name = "(draft — customer TBD)";
+      }
+      if (!payload.job_address) {
+        payload.job_address = "(address pending)";
+      }
+      const { data, error } = await supabase
+        .from("quotes")
+        .insert(payload)
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Failed to create draft for photos:", error);
+        return null;
+      }
+      // Persist option rows if the user had multi-option turned on.
+      if (isMultiOption) {
+        await persistOptions(data.id);
+      }
+      setDraftQuoteId(data.id);
+      return data.id as string;
+    } catch (err) {
+      console.error("Failed to create draft for photos:", err);
+      return null;
+    }
+  }
+
   async function handleSave() {
     const reqErr = validateRequired();
     if (reqErr) return Alert.alert("Required", reqErr);
 
     setSaving(true);
     try {
-      let id = quoteId;
+      // Prefer an id from route params; fall back to a draft created by
+      // the photo uploader so we update that row instead of inserting a
+      // duplicate.
+      let id = quoteId ?? draftQuoteId;
       if (id) {
         const { contractor_id, status, ...updateData } = buildPayload();
         await supabase.from("quotes").update(updateData).eq("id", id);
@@ -460,6 +507,7 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
           .single();
         if (error) throw error;
         id = data.id;
+        setDraftQuoteId(data.id);
       }
       if (isMultiOption && id) {
         await persistOptions(id);
@@ -498,11 +546,14 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
 
     setSending(true);
     try {
-      let id = quoteId;
+      // Reuse a draft created by the photo uploader so Send updates that
+      // row instead of inserting a duplicate quote.
+      let id = quoteId ?? draftQuoteId;
       if (!id) {
         const { data, error } = await supabase.from("quotes").insert(buildPayload()).select().single();
         if (error) throw error;
         id = data.id;
+        setDraftQuoteId(data.id);
       } else {
         const { contractor_id, status, ...updateData } = buildPayload();
         await supabase.from("quotes").update(updateData).eq("id", id);
@@ -603,18 +654,14 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
           />
         </View>
 
-        {/* Photos — only on existing quotes. New quotes need to save first so
-            we have a quote id to attach photos to. */}
-        {quoteId ? (
-          <QuotePhotoUploader quoteId={quoteId} />
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Photos</Text>
-            <Text style={styles.photoHint}>
-              Save the quote first, then come back to attach photos.
-            </Text>
-          </View>
-        )}
+        {/* Photos — rendered in both new-quote and edit-quote modes.
+            When new (no quoteId), the uploader calls ensureQuoteForPhotos
+            on first attach to auto-save a draft with placeholder customer
+            fields, so contractors can snap before typing. */}
+        <QuotePhotoUploader
+          quoteId={quoteId ?? draftQuoteId}
+          onRequireQuoteId={ensureQuoteForPhotos}
+        />
 
         {/* Multi-option toggle */}
         <View style={styles.card}>

@@ -16,8 +16,20 @@ import { QuotePhoto } from "../types";
 import { colors, spacing } from "../lib/theme";
 
 interface QuotePhotoUploaderProps {
-  quoteId: string;
+  /**
+   * Quote id. Pass null when editing a brand-new quote that hasn't been
+   * saved yet — the uploader will call `onRequireQuoteId` to auto-create
+   * a draft the first time the user tries to attach a photo.
+   */
+  quoteId: string | null;
   initialPhotos?: QuotePhoto[];
+  /**
+   * Called when the user tries to add a photo and no quoteId exists yet.
+   * Must persist a draft quote (using whatever write path the parent
+   * already uses) and return the new quote id. Return null if the draft
+   * couldn't be created — the uploader will surface an error.
+   */
+  onRequireQuoteId?: () => Promise<string | null>;
 }
 
 const MAX_PHOTOS = 10;
@@ -55,19 +67,33 @@ function mimeFromUri(uri: string, fallback = "image/jpeg"): string {
 export function QuotePhotoUploader({
   quoteId,
   initialPhotos,
+  onRequireQuoteId,
 }: QuotePhotoUploaderProps) {
   const [photos, setPhotos] = useState<QuotePhoto[]>(initialPhotos ?? []);
-  const [loading, setLoading] = useState(initialPhotos === undefined);
+  // Skip the initial fetch when we don't have a quote id yet — nothing to load.
+  const [loading, setLoading] = useState(
+    quoteId !== null && initialPhotos === undefined
+  );
   const [uploading, setUploading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Track the effective quote id locally so a draft created mid-flow
+  // is reused for subsequent uploads without waiting for the parent
+  // re-render.
+  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
 
-  // Fetch existing photos if not passed in.
+  // Keep local id in sync if the parent swaps it in (e.g. after Save Draft).
+  useEffect(() => {
+    setCurrentQuoteId(quoteId);
+  }, [quoteId]);
+
+  // Fetch existing photos if not passed in. Only runs when we have an id.
   useEffect(() => {
     if (initialPhotos !== undefined) return;
+    if (!currentQuoteId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(`/api/quotes/${quoteId}/photos`);
+        const res = await apiFetch(`/api/quotes/${currentQuoteId}/photos`);
         if (!res.ok) {
           setLoading(false);
           return;
@@ -83,7 +109,7 @@ export function QuotePhotoUploader({
     return () => {
       cancelled = true;
     };
-  }, [quoteId, initialPhotos]);
+  }, [currentQuoteId, initialPhotos]);
 
   async function handleAdd() {
     if (photos.length >= MAX_PHOTOS) {
@@ -111,6 +137,30 @@ export function QuotePhotoUploader({
 
     if (result.canceled || !result.assets?.length) return;
     const asset = result.assets[0];
+
+    // Resolve the quote id. If none yet, ask the parent to create a draft
+    // (e.g. in new-quote mode where the user snaps photos before typing
+    // customer info). This mirrors the web QuoteForm ensureQuoteForPhotos
+    // flow.
+    let qid = currentQuoteId;
+    if (!qid && onRequireQuoteId) {
+      qid = await onRequireQuoteId();
+      if (!qid) {
+        Alert.alert(
+          "Couldn't save draft",
+          "We couldn't save a draft to attach this photo to. Try again in a moment."
+        );
+        return;
+      }
+      setCurrentQuoteId(qid);
+    }
+    if (!qid) {
+      Alert.alert(
+        "Save required",
+        "Save this quote as a draft first, then come back to attach photos."
+      );
+      return;
+    }
 
     // Enforce client-side size cap so we don't spend bandwidth uploading a
     // file the server will just reject.
@@ -151,7 +201,7 @@ export function QuotePhotoUploader({
         headers.Authorization = `Bearer ${session.access_token}`;
       }
 
-      const res = await fetch(`${APP_URL}/api/quotes/${quoteId}/photos`, {
+      const res = await fetch(`${APP_URL}/api/quotes/${qid}/photos`, {
         method: "POST",
         headers,
         body: fd as unknown as BodyInit,
@@ -184,10 +234,11 @@ export function QuotePhotoUploader({
   }
 
   async function handleRemove(photo: QuotePhoto) {
+    if (!currentQuoteId) return;
     setBusyId(photo.id);
     try {
       const res = await apiFetch(
-        `/api/quotes/${quoteId}/photos/${photo.id}`,
+        `/api/quotes/${currentQuoteId}/photos/${photo.id}`,
         { method: "DELETE" }
       );
       if (!res.ok) {
