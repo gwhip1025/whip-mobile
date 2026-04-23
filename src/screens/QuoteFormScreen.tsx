@@ -311,6 +311,68 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
     setShowTemplatePicker(false);
   }
 
+  // ---- save current form as template ----
+  // Multi-option templates aren't supported by the web API; button is disabled in that mode.
+  const canSaveAsTemplate =
+    !isMultiOption && lineItems.some((i) => i.description.trim().length > 0);
+
+  async function handleSaveAsTemplate() {
+    if (!canSaveAsTemplate) return;
+    const defaultName = `Template from ${customerName.trim() || "quote"}`;
+
+    const save = async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        Alert.alert("Error", "Template name is required.");
+        return;
+      }
+      try {
+        const res = await apiFetch(`/api/templates`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: trimmed,
+            line_items: parseItems(lineItems),
+            tax_rate: tax,
+            scope_of_work: scopeOfWork.trim() || null,
+            valid_days: parseInt(validDays) || 30,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        // Refresh the list so the new template shows up in the picker immediately.
+        const newTpl = await res.json().catch(() => null);
+        if (newTpl && newTpl.id) {
+          setTemplates((prev) => [newTpl as QuoteTemplate, ...prev]);
+        }
+        Alert.alert("Saved", "Template saved. Pick it on your next quote.");
+      } catch {
+        Alert.alert("Error", "Failed to save template.");
+      }
+    };
+
+    // iOS supports Alert.prompt for a text input; Android doesn't — fall back to a default name.
+    const promptFn = (Alert as { prompt?: typeof Alert.prompt }).prompt;
+    if (typeof promptFn === "function") {
+      promptFn(
+        "Save as template",
+        "Name this template so you can reuse it later.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Save",
+            onPress: (value?: string) => {
+              const name = (value ?? "").trim() || defaultName;
+              save(name);
+            },
+          },
+        ],
+        "plain-text",
+        defaultName
+      );
+    } else {
+      save(defaultName);
+    }
+  }
+
   // ---- validation helpers ----
   function validateRequired(): string | null {
     if (!customerName.trim() || !jobAddress.trim()) {
@@ -765,6 +827,17 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
 
         <View style={styles.actions}>
           <TouchableOpacity
+            style={[styles.templateSaveBtn, !canSaveAsTemplate && styles.btnDisabled]}
+            onPress={handleSaveAsTemplate}
+            disabled={!canSaveAsTemplate || saving || sending}
+          >
+            <Text style={styles.templateSaveBtnText}>
+              {isMultiOption
+                ? "Save as Template (single-option only)"
+                : "Save as Template"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.saveBtn}
             onPress={handleSave}
             disabled={saving || sending}
@@ -915,6 +988,8 @@ const styles = StyleSheet.create({
   actions: { gap: 10 },
   saveBtn: { backgroundColor: colors.white, borderRadius: 10, padding: 16, alignItems: "center", borderWidth: 1, borderColor: colors.gray[200] },
   saveBtnText: { fontSize: 15, fontWeight: "600", color: colors.black },
+  templateSaveBtn: { backgroundColor: "transparent", borderRadius: 10, padding: 14, alignItems: "center", borderWidth: 1, borderColor: colors.gray[300], borderStyle: "dashed" },
+  templateSaveBtnText: { fontSize: 14, fontWeight: "600", color: colors.black },
   sendBtn: { backgroundColor: colors.primary, borderRadius: 10, padding: 16, alignItems: "center" },
   sendBtnText: { fontSize: 16, fontWeight: "700", color: colors.black },
   btnDisabled: { opacity: 0.6 },
