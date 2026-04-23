@@ -26,6 +26,7 @@ import {
 } from "../types";
 import { calculateTotals, formatCurrency } from "../lib/utils";
 import { colors, spacing } from "../lib/theme";
+import { QuotePhotoUploader } from "../components/QuotePhotoUploader";
 
 type Props = NativeStackScreenProps<any, "NewQuote" | "EditQuote">;
 
@@ -602,6 +603,19 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
           />
         </View>
 
+        {/* Photos — only on existing quotes. New quotes need to save first so
+            we have a quote id to attach photos to. */}
+        {quoteId ? (
+          <QuotePhotoUploader quoteId={quoteId} />
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Photos</Text>
+            <Text style={styles.photoHint}>
+              Save the quote first, then come back to attach photos.
+            </Text>
+          </View>
+        )}
+
         {/* Multi-option toggle */}
         <View style={styles.card}>
           <View style={styles.toggleRow}>
@@ -996,6 +1010,7 @@ const styles = StyleSheet.create({
   templateBtn: { backgroundColor: colors.white, borderRadius: 12, padding: 12, alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: colors.gray[200] },
   templateBtnText: { fontSize: 14, fontWeight: "600", color: colors.black },
   emptyTemplates: { fontSize: 13, color: colors.gray[500], lineHeight: 18 },
+  photoHint: { fontSize: 13, color: colors.gray[500], lineHeight: 18 },
   pickSavedBtn: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.gray[100], borderRadius: 8 },
   pickSavedBtnText: { fontSize: 13, fontWeight: "600", color: colors.black },
   pickerRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.gray[100] },
