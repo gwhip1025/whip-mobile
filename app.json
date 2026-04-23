@@ -35,6 +35,10 @@
       "supabaseUrl": "https://wvfqzqiibzlpnfwzrcqn.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2ZnF6cWlpYnpscG5md3pyY3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjA5MzAsImV4cCI6MjA5MTQzNjkzMH0.WH-DkySTQySTiwKVpLxjsIuMx1Np_6CgRIEcV350IDU",
       "appUrl": "https://whip1.vercel.app"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store"
+    ]
   }
 }
