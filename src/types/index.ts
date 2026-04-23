@@ -54,6 +54,16 @@ export interface Quote {
   updated_at: string;
 }
 
+export interface QuotePhoto {
+  id: string;
+  quote_id: string;
+  storage_path: string;
+  position: number;
+  created_at: string;
+  /** Resolved public URL (populated at fetch time, not a DB column). */
+  url?: string;
+}
+
 export interface ContractorProfile {
   id: string;
   user_id: string;
