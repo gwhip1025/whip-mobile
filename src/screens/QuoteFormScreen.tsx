@@ -570,6 +570,21 @@ export default function QuoteFormScreen({ route, navigation }: Props) {
         throw new Error(err.error || "Failed to send");
       }
 
+      // Detect partial delivery — e.g. SMS sent but email bounced because
+      // the Resend sender domain isn't verified. Surface it instead of
+      // silently claiming success.
+      const body = (await res.json().catch(() => ({}))) as {
+        deliveryErrors?: string[];
+      };
+      if (body.deliveryErrors && body.deliveryErrors.length > 0) {
+        Alert.alert(
+          "Partial delivery",
+          `${body.deliveryErrors.join(", ")}.\n\nCheck your Resend sender domain.`
+        );
+        navigation.replace("QuoteDetail", { quoteId: id! });
+        return;
+      }
+
       Alert.alert("Quote Sent!", "Your customer will receive it shortly.");
       navigation.replace("QuoteDetail", { quoteId: id! });
     } catch (e: any) {
