@@ -96,7 +96,7 @@ export default function SettingsScreen() {
 
   function openBilling() {
     Linking.openURL(`${APP_URL}/dashboard/settings`).catch(() => {
-      Alert.alert("Couldn't open", "Please visit whip1.vercel.app on your browser.");
+      Alert.alert("Couldn't open", "Please visit whipquotes.com on your browser.");
     });
   }
 
